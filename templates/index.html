@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question Bot</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-image: url("static/images/bag.jpg");
+            background-size: cover;
+        }
+        #container {
+            text-align: center;
+            background: white;
+            min-height: 70px;
+            height: auto;
+            width: auto;
+            max-width: 600px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        #question-container {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #ddd;
+        }
+        .response-btn {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            margin-bottom: 40px;
+            size: 10px;
+        }
+        #get-question-btn, #reset-session-btn {
+            background-color: #b83d9b;
+            color: white;
+        }
+        #mood-image {
+            bottom: 0;
+            width: 700px;
+            height: 700px;
+            margin: 20px;
+        }
+        #padding10 {
+            margin: 10px;
+        }
+        selector {
+            background-image: url("static/images/bag.png");
+            background-size: cover;
+        }
+
+        #result-modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        #result-modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+        }
+        #result-modal h2 {
+            margin-top: 0;
+        }
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-modal:hover,
+        .close-modal:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <img id="mood-image" src="static/images/neutral1.png" alt="Mood Image">
+    <div id="container">
+        <h1>Доктор Павел хочет жениться</h1>
+        <div id="question-container">
+            <p id="question">Доктор Павел ищет себе идеального партнера. Насколько хорошо вы подходите нейросети? Он будет задавать вам вопросы. Внимательно подумайте над своим ответом и запишите его.</p>
+            <button id="get-question-btn">Далее</button>
+        </div>
+        <div id="response-section" style="display: none;">
+            <input type="text" id="user-response" placeholder="Ваш ответ">
+            <button id="submit-response-btn">Это мой ответ</button>
+            <div id="think-container">
+                <div id="padding10">Доктор Павел думает про вас, что:</div>
+                <p id="think">Дайте подумать.....</p>
+            </div>
+        </div>
+        <button id="reset-session-btn" style="display: none;">Reset Session</button>
+    </div>
+    <div id="result-modal">
+        <div id="result-modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Результат теста</h2>
+            <p id="result-message"></p>
+        </div>
+    </div>
+    <script>
+        function getRandomImageNumber() {
+            return Math.floor(Math.random() * 3) + 1;
+        }
+
+        function updateMoodImage(weight) {
+            let moodImageUrl = '';
+            const randomNum = getRandomImageNumber();
+            if (weight < -4) {
+                moodImageUrl = `static/images/angry${randomNum}.png`;
+            } else if (weight > 4) {
+                moodImageUrl = `static/images/good${randomNum}.png`;
+            } else {
+                moodImageUrl = `static/images/neutral${randomNum}.png`;
+            }
+            $('#mood-image').attr('src', moodImageUrl);  
+        }
+
+        function checkUserWeight(weight) {
+            if (weight <= -10 || weight >= 10) {
+                $.get('/get_result', function(data) {
+                    $('#result-message').text(data.result);
+                    $('#result-modal').show();
+                });
+            }
+        }
+
+        $(document).ready(function() {
+            $('.close-modal').click(function() {
+                $('#result-modal').hide();
+            });
+
+            $('#get-question-btn').click(function() {
+                $.get('/get_question', function(data) {
+                    $('#question').text(data.question);
+                    $('#response-section').show();
+                    updateMoodImage(data.user_weight);
+                });
+            });
+
+            $('#submit-response-btn').click(function() {
+                var response = $('#user-response').val();
+                $.ajax({
+                    type: 'POST',
+                    url: '/submit_response',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ response: response }),
+                    success: function(data) {
+                        $('#question').text('Доктор Павел внимательно обдумывает ваш ответ.');
+                        $('#response-section').hide();
+                        updateMoodImage(data.user_weight);
+
+                        $.get('/get_think', { user_response: response }, function(thinkData) {
+                            $('#think').text(thinkData.think);
+                            checkUserWeight(data.user_weight);
+                        });
+                    }
+                });
+            });
+
+            $('#reset-session-btn').click(function() {
+                $.post('/reset_session', function(data) {
+                    $('#question').text('Доктор Павел внимательно обдумывает ваш ответ.');
+                    $('#response-section').hide();
+                    $('#reset-session-btn').hide();
+                    updateMoodImage(data.user_weight);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
