@@ -13,7 +13,7 @@
             height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
-            background-image: url("static/images/bag.jpg");
+            background: white;
             background-size: cover;
         }
         #container {
@@ -23,9 +23,12 @@
             height: auto;
             width: auto;
             max-width: 600px;
-            border-radius: 10px;
+            border: black;
+            border: 2px solid;
+
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             padding: 40px;
+          
         }
         h1 {
             margin-bottom: 20px;
@@ -36,8 +39,9 @@
         button {
             padding: 10px 20px;
             margin: 5px;
-            border: none;
-            border-radius: 5px;
+            border: black;
+            border: 2px solid;
+            border: black;
             cursor: pointer;
             transition: background-color 0.3s;
         }
@@ -50,14 +54,24 @@
             color: white;
             margin-bottom: 40px;
             size: 10px;
+            border: black;
+            border: 2px solid;
         }
-        #get-question-btn, #reset-session-btn {
-            background-color: #b83d9b;
+        #get-question-btn {
+            background-color: #000000;
             color: white;
+            border: black;
+            border: 2px solid;
+        }
+        #reset-session-btn {
+            background-color: #888;
+            color: white;
+            border: black;
+            border: 2px solid;
         }
         #mood-image {
             bottom: 0;
-            width: 700px;
+            width: 500px;
             height: 700px;
             margin: 20px;
         }
@@ -65,7 +79,7 @@
             margin: 10px;
         }
         selector {
-            background-image: url("static/images/bag.png");
+            background-image: url("static/images/bag.jpg");
             background-size: cover;
         }
 
@@ -88,6 +102,7 @@
             width: 80%;
             max-width: 600px;
             border-radius: 10px;
+            border: black;
         }
         #result-modal h2 {
             margin-top: 0;
@@ -107,22 +122,22 @@
     </style>
 </head>
 <body>
-    <img id="mood-image" src="static/images/neutral1.png" alt="Mood Image">
+    <img id="mood-image" src="static/images/neutral1.jpg" alt="Mood Image">
     <div id="container">
-        <h1>Доктор Павел хочет жениться</h1>
+        <h1>Доктор Павел <span style="color:red">БОЛЬШЕ НЕ ХОЧЕТ</span> хочет жениться</h1>
         <div id="question-container">
             <p id="question">Доктор Павел ищет себе идеального партнера. Насколько хорошо вы подходите нейросети? Он будет задавать вам вопросы. Внимательно подумайте над своим ответом и запишите его.</p>
             <button id="get-question-btn">Далее</button>
         </div>
         <div id="response-section" style="display: none;">
-            <input type="text" id="user-response" placeholder="Ваш ответ">
+            <textarea type="text" id="user-response" placeholder="Ваш ответ">
             <button id="submit-response-btn">Это мой ответ</button>
             <div id="think-container">
                 <div id="padding10">Доктор Павел думает про вас, что:</div>
                 <p id="think">Дайте подумать.....</p>
             </div>
         </div>
-        <button id="reset-session-btn" style="display: none;">Reset Session</button>
+        <button id="reset-session-btn">Начать заново</button>
     </div>
     <div id="result-modal">
         <div id="result-modal-content">
@@ -132,6 +147,8 @@
         </div>
     </div>
     <script>
+        let isRequestPending = false;
+
         function getRandomImageNumber() {
             return Math.floor(Math.random() * 3) + 1;
         }
@@ -139,18 +156,18 @@
         function updateMoodImage(weight) {
             let moodImageUrl = '';
             const randomNum = getRandomImageNumber();
-            if (weight < -4) {
-                moodImageUrl = `static/images/angry${randomNum}.png`;
-            } else if (weight > 4) {
-                moodImageUrl = `static/images/good${randomNum}.png`;
+            if (weight < -3) {
+                moodImageUrl = static/images/angry${randomNum}.jpg;
+            } else if (weight > 3) {
+                moodImageUrl = static/images/good${randomNum}.jpg;
             } else {
-                moodImageUrl = `static/images/neutral${randomNum}.png`;
+                moodImageUrl = static/images/neutral${randomNum}.jpg;
             }
             $('#mood-image').attr('src', moodImageUrl);  
         }
 
         function checkUserWeight(weight) {
-            if (weight <= -10 || weight >= 10) {
+            if (weight <= -3 || weight >= 3) {
                 $.get('/get_result', function(data) {
                     $('#result-message').text(data.result);
                     $('#result-modal').show();
@@ -164,14 +181,20 @@
             });
 
             $('#get-question-btn').click(function() {
+                isRequestPending = true;
                 $.get('/get_question', function(data) {
                     $('#question').text(data.question);
                     $('#response-section').show();
                     updateMoodImage(data.user_weight);
+                    isRequestPending = false;
+                }).fail(function() {
+                    isRequestPending = false;
                 });
             });
 
             $('#submit-response-btn').click(function() {
+                if (isRequestPending) return;
+                isRequestPending = true;
                 var response = $('#user-response').val();
                 $.ajax({
                     type: 'POST',
@@ -186,20 +209,31 @@
                         $.get('/get_think', { user_response: response }, function(thinkData) {
                             $('#think').text(thinkData.think);
                             checkUserWeight(data.user_weight);
+                            $('#reset-session-btn').show();
+                        }).always(function() {
+                            isRequestPending = false;
                         });
+                    },
+                    error: function() {
+                        isRequestPending = false;
                     }
                 });
             });
 
             $('#reset-session-btn').click(function() {
+                if (isRequestPending) return;
+                isRequestPending = true;
                 $.post('/reset_session', function(data) {
-                    $('#question').text('Доктор Павел внимательно обдумывает ваш ответ.');
+                    $('#question').text('Доктор Павел ищет себе идеального партнера. Насколько хорошо вы подходите нейросети? Он будет задавать вам вопросы. Внимательно подумайте над своим ответом и запишите его.');
                     $('#response-section').hide();
                     $('#reset-session-btn').hide();
                     updateMoodImage(data.user_weight);
+                    isRequestPending = false;
+                }).fail(function() {
+                    isRequestPending = false;
                 });
             });
         });
     </script>
 </body>
-</html>
+</html> 
